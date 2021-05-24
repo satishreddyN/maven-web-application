@@ -1,0 +1,37 @@
+node
+{
+    def mavenHome =tool name:"maven3.8.1"
+    
+    properties([[$class: 'JobLocalConfiguration', changeReasonComment: ''], pipelineTriggers([pollSCM('* * * * *')])])
+    
+    properties([buildDiscarder(logRotator(artifactDaysToKeepStr: '', artifactNumToKeepStr: '5', daysToKeepStr: '', numToKeepStr: '5')), [$class: 'JobLocalConfiguration', changeReasonComment: ''], pipelineTriggers([pollSCM('* * * * *')])])
+    stage('checkoutcode')
+    {
+        git branch: 'development', credentialsId: '9063e9b5-e77d-4cee-af4c-acbebcdcaed5', url: 'https://github.com/satishreddyN/maven-web-application.git'
+    }
+    stage('build')
+    {
+        sh "${mavenHome}/bin/mvn clean package"
+    }
+    stage('executesonarqubereport')
+    {
+        sh "${mavenHome}/bin/mvn sonar:sonar"
+    }
+    stage('uploadArtifactsintoNexus')
+    {
+        sh "${mavenHome}/bin/mvn deploy"
+    }
+    stage('Deployappintotomcatserver')
+    {
+    sshagent(['72c1fd46-2871-4df7-b754-e2832892cb55']) {
+    sh "scp -o StrictHostKeyChecking=no target/maven-web-application.war ec2-user@65.2.127.202://opt/apache-tomcat-9.0.45/webapps/"
+}    
+    }
+    stage('SendEmailNotification')
+    {
+        emailext body: '''build over
+Regards,
+mithuns technologies
+''', subject: 'build over', to: 'nallakongusatishreddy@gmail.com'
+    }
+}
